@@ -36,7 +36,7 @@ def rag_fetch(retriever: MultiVectorRetriever, llm: str, question: str | None = 
         ("human", QUESTION_RAG_PROMPT if question else TOPICS_RAG_PROMPT),
     ])
 
-    llm = OllamaLLM(model=llm)
+    llm = OllamaLLM(model=llm, temperature=0.2)
     chain = prompt | llm | StrOutputParser()
 
     rag_query = clean_response(chain.invoke({
@@ -51,7 +51,7 @@ def rag_fetch(retriever: MultiVectorRetriever, llm: str, question: str | None = 
 
 
 def query(llm: str, question: str | None = None, topics: str | None = None, output_format=None,
-          context: list[Document] = None, num_slides=25):
+          context: list[Document] = None, num_slides=25, num_words=2500):
     if not question:
         if topics:
             question = f'Elaborate on the following topics: {topics}'
@@ -63,13 +63,18 @@ def query(llm: str, question: str | None = None, topics: str | None = None, outp
                    ' Markdown.')
     question_prompt = ('Answer the following question as a blog post using Markdown format.'
                        ' Do not include any introductory text or call to action, just the blog post content.'
-                       ' Aim for around 2500 words. Delve as deep as you see fit.')
+                       ' Do not reference individual documents or the context, focus on the content. '
+                       f' Aim for around {num_words} words. Delve as deep as you see fit.')
     if output_format == 'slides':
         system_role = ('You are a researcher and domain expert working for the OGC,'
                        ' about to present your work at a conference')
         question_prompt = ('Answer the following question as a set of PowerPoint slides using Markdown format.'
                            ' Include references to useful images or diagrams to accompany the slides'
                            ' (or if the slide is an image/diagram only), but only when necessary.'
+                           ' Use a combination bullet points and text, do not make the bullet points too concise '
+                           ' and try to include examples. '
+                           ' Do not be afraid to have some text-heavy slides, we want a stand-alone presentation. '
+                           ' Do not reference individual documents or the context, focus on the content. '
                            ' Do not include any introductory text or call to action, just the content for the slides.'
                            f' Aim for at least {num_slides} slides, but no more than {int(num_slides * 1.3)}.'
                            f' Delve as deep as you see fit.')
@@ -90,7 +95,7 @@ def query(llm: str, question: str | None = None, topics: str | None = None, outp
 
 
 def _main():
-    parser = argparse.ArgumentParser(description="Query a vector store with LLM.")
+    parser = argparse.ArgumentParser(description="OGC LLM generator")
     parser.add_argument("-m", '--llm', type=str, default='gemma3:12b', help="LLM to use.")
     parser.add_argument("--vector-db", type=str, default='chroma_store',
                         help="Path to the Chroma store directory.")
@@ -99,6 +104,7 @@ def _main():
     parser.add_argument("-f", '--output-format', choices=['blog', 'slides'], help="Output format.")
     parser.add_argument('--num-docs', type=int, default=8, help="Number of RAG chunks to retrieve.")
     parser.add_argument('--num-slides', type=int, default=25, help="Number of slides to generate.")
+    parser.add_argument('--num-words', type=int, default=2500, help="Word length of blog post.")
     parser.add_argument('-o', '--output-file', default='-', help="Output file.")
     parser_group = parser.add_mutually_exclusive_group(required=True)
     parser_group.add_argument('-q', "--question", type=str, help="Question to ask.")
@@ -116,7 +122,7 @@ def _main():
                           num_chunks=args.num_docs)
     print(f'{len(documents)} chunks retrieved in {(time.time_ns() - start) / 1e9:.1f} seconds.', file=sys.stderr)
     content = query(llm=args.llm, question=args.question, topics=args.topics, output_format=args.output_format,
-                    context=documents, num_slides=args.num_slides)
+                    context=documents, num_slides=args.num_slides, num_words=args.num_words)
     if not args.output_file or args.output_file == '-':
         print(content)
     else:
