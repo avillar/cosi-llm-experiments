@@ -1,3 +1,4 @@
 *.pyc
 chroma_store
 *.db
+whoosh_index

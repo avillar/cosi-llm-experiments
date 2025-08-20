@@ -1,3 +1,6 @@
+whoosh
+langchain-text-splitters
+langchain-openai
 langchain
 langchain-core
 langchain-ollama
